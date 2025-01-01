@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="create-project-container">
+    <form method="POST" class="project-form" enctype="multipart/form-data">
+        <div class="form-columns">
+            <!-- Left Column - Project Details -->
+            <div class="form-column left-column">
+                <div class="form-group">
+                    <label class="form-label">Title</label>
+                    <input type="text" name="title" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea name="description" class="form-control" rows="4" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Team Members</label>
+                    <div id="team-members-container">
+                        <div class="team-member-input">
+                            <input type="text" class="form-control" name="team_members[]" placeholder="Profile Link">
+                            <button type="button" class="remove-member" onclick="removeMember(this)">×</button>
+                        </div>
+                    </div>
+                    <button type="button" class="add-member-btn" onclick="addTeamMember()">+ Add Team Member</button>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Citations</label>
+                    <textarea name="citations" class="form-control" rows="2" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Goal Amount (ETH)</label>
+                    <input type="number" name="goal_amount" class="form-control" step="0.01" required>
+                </div>
+            </div>
+
+            <!-- Right Column - File Upload and Submit -->
+            <div class="form-column right-column">
+                <div class="form-group file-upload-section">
+                    <label class="form-label">Project Documents</label>
+                    <div class="file-upload-container">
+                        <input type="file" name="documents[]" id="file-upload" accept=".pdf" multiple class="file-input">
+                        <label for="file-upload" class="file-upload-label">
+                            <span>Attach PDFs</span>
+                        </label>
+                        <div id="file-list" class="file-list"></div>
+                    </div>
+                </div>
+
+                <button type="submit" class="submit-btn">Submit Project</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+function addTeamMember() {
+    const container = document.getElementById('team-members-container');
+    const newMember = document.createElement('div');
+    newMember.className = 'team-member-input';
+    newMember.innerHTML = `
+        <input type="text" class="form-control" name="team_members[]" placeholder="Profile Link">
+        <button type="button" class="remove-member" onclick="removeMember(this)">×</button>
+    `;
+    container.appendChild(newMember);
+}
+
+function removeMember(button) {
+    button.parentElement.remove();
+}
+
+// Store selected files
+let selectedFiles = new DataTransfer();
+
+// File upload handling
+document.getElementById('file-upload').addEventListener('change', function(e) {
+    const fileList = document.getElementById('file-list');
+    
+    // Add new files to our DataTransfer object
+    for(let file of this.files) {
+        selectedFiles.items.add(file);
+    }
+    
+    // Update the input's files
+    this.files = selectedFiles.files;
+    
+    // Update the display
+    updateFileList();
+});
+
+function updateFileList() {
+    const fileList = document.getElementById('file-list');
+    fileList.innerHTML = '';
+    
+    for(let i = 0; i < selectedFiles.files.length; i++) {
+        const file = selectedFiles.files[i];
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.innerHTML = `
+            <span>${file.name}</span>
+            <button type="button" class="remove-file" data-index="${i}">×</button>
+        `;
+        fileList.appendChild(fileItem);
+    }
+}
+
+// Event delegation for remove buttons
+document.getElementById('file-list').addEventListener('click', function(e) {
+    if (e.target.classList.contains('remove-file')) {
+        const index = parseInt(e.target.dataset.index);
+        const newFiles = new DataTransfer();
+        
+        // Copy all files except the removed one
+        for(let i = 0; i < selectedFiles.files.length; i++) {
+            if (i !== index) {
+                newFiles.items.add(selectedFiles.files[i]);
+            }
+        }
+        
+        // Update our stored files
+        selectedFiles = newFiles;
+        
+        // Update the input's files
+        document.getElementById('file-upload').files = selectedFiles.files;
+        
+        // Update the display
+        updateFileList();
+    }
+});
+
+// Add file validation
+document.querySelector('form').addEventListener('submit', function(e) {
+    const files = selectedFiles.files;
+    if (files.length > 5) {  // Maximum 5 files
+        e.preventDefault();
+        alert('Maximum 5 files allowed');
+        return;
+    }
+    
+    let totalSize = 0;
+    for (let file of files) {
+        totalSize += file.size;
+        if (file.size > 10 * 1024 * 1024) {  // 10MB per file
+            e.preventDefault();
+            alert('Each file must be less than 10MB');
+            return;
+        }
+    }
+    
+    if (totalSize > 50 * 1024 * 1024) {  // 50MB total
+        e.preventDefault();
+        alert('Total file size must be less than 50MB');
+        return;
+    }
+});
+</script>
+{% endblock %} 

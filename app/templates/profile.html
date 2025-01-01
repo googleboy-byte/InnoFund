@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="user-profile">
+        {% if user.photo_url %}
+            <img src="{{ user.photo_url }}" alt="Profile Photo" class="profile-photo">
+        {% endif %}
+        <h3>{{ user.display_name }}</h3>
+        
+        <div class="profile-share">
+            <button class="share-btn" onclick="copyProfileLink()">
+                Share Profile
+            </button>
+        </div>
+    </div>
+
+    {% if is_owner %}
+    <button class="auth-btn" onclick="window.location.href='{{ url_for('auth.logout') }}'">
+        Logout
+    </button>
+    {% endif %}
+</div>
+
+<div class="profile-actions">
+    {% if is_owner %}
+        <button class="edit-profile-btn">
+            <i class="fas fa-edit"></i> Edit Profile
+        </button>
+    {% endif %}
+    <button class="share-profile-btn" onclick="copyProfileLink()">
+        <i class="fas fa-share-alt"></i> Share Profile
+    </button>
+</div>
+
+<script>
+function copyProfileLink() {
+    const url = "{{ profile_url }}";
+    navigator.clipboard.writeText(url).then(() => {
+        const btn = document.querySelector('.share-btn');
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => {
+            btn.textContent = originalText;
+        }, 2000);
+    });
+}
+</script>
+{% endblock %} 

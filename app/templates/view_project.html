@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="project-view-container">
+    <div class="project-header-section">
+        <div class="project-main-info">
+            <h1>{{ project.title }}</h1>
+            <div class="project-creator">
+                <div class="creator-avatar">
+                    {% if creator and creator.photo_url %}
+                        <img src="{{ creator.photo_url }}" alt="{{ creator.display_name }}">
+                    {% else %}
+                        <span>{{ project.creator_name[0]|upper }}</span>
+                    {% endif %}
+                </div>
+                <div class="creator-info">
+                    <a href="{{ url_for('main.public_profile', user_id=project.created_by) }}" class="creator-name">
+                        {{ project.creator_name }}
+                    </a>
+                    <span class="creation-date">Created {{ moment(project.created_at).fromNow() }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="project-actions">
+            <div class="action-buttons">
+                {% if is_owner %}
+                    <a href="{{ url_for('main.edit_project', project_id=project.id) }}" class="edit-btn">
+                        <i class="fas fa-edit"></i> Edit Project
+                    </a>
+                {% else %}
+                    <button class="donate-btn" onclick="showDonateModal('{{ project.id }}', '{{ project.title }}')">
+                        <i class="fas fa-hand-holding-usd"></i> Donate Now
+                    </button>
+                {% endif %}
+            </div>
+            
+            <div class="share-buttons">
+                <button onclick="shareProject('twitter')" class="share-btn twitter">
+                    <i class="fab fa-twitter"></i>
+                </button>
+                <button onclick="shareProject('linkedin')" class="share-btn linkedin">
+                    <i class="fab fa-linkedin"></i>
+                </button>
+                <button onclick="copyProjectLink()" class="share-btn copy">
+                    <i class="fas fa-link"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="project-content">
+        <div class="project-main">
+            <div class="funding-status">
+                <div class="funding-progress">
+                    <div class="progress-stats">
+                        <span class="raised">{{ project.funds_raised|default(0, true) }} ETH</span>
+                        <span class="goal">{{ project.goal_amount }} ETH</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ (project.funds_raised|default(0, true) / project.goal_amount * 100)|round|int }}%"></div>
+                    </div>
+                    <div class="progress-percentage">
+                        {{ ((project.funds_raised|default(0, true) / project.goal_amount * 100)|round|int) }}% funded
+                    </div>
+                </div>
+                
+                <div class="funding-meta">
+                    <div class="meta-item">
+                        <span class="label">Status</span>
+                        <span class="value status-{{ project.status }}">{{ project.status|title }}</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="label">Team Members</span>
+                        <span class="value">{{ project.team_members|length }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="project-description">
+                <h2>About the Project</h2>
+                <div class="description-content">
+                    {{ project.description }}
+                </div>
+            </div>
+
+            {% if project.citations %}
+            <div class="project-citations">
+                <h2>Citations & References</h2>
+                <div class="citations-content">
+                    {{ project.citations|safe }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if project.documents %}
+            <div class="project-documents">
+                <h2>Project Documents</h2>
+                <div class="documents-grid">
+                    {% for doc in project.documents %}
+                    <a href="{{ doc.url }}" target="_blank" class="document-item">
+                        <span class="doc-name">{{ doc.name }}</span>
+                        <span class="doc-action">View →</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="project-sidebar">
+            <div class="team-section">
+                <h3>Project Team</h3>
+                <div class="team-list">
+                    {% for member in project.team_members %}
+                    <div class="team-member" data-member-id="{{ member.id }}">
+                        <div class="member-avatar">
+                            {% if member.photo_url %}
+                                <img src="{{ member.photo_url }}" alt="{{ member.name }}">
+                            {% else %}
+                                <span>{{ member.name[0]|upper }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="member-info">
+                            <div class="member-name">{{ member.name }}</div>
+                            <div class="member-title">{{ member.title }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {% if project.transactions %}
+            <div class="transactions-section">
+                <h3>Recent Contributions</h3>
+                <div class="transactions-list">
+                    {% for tx in project.transactions[-5:] %}
+                    <div class="transaction-item">
+                        <div class="tx-info">
+                            <span class="tx-amount">{{ tx.amount }} ETH</span>
+                            <span class="tx-from">from {{ tx.contributor_name }}</span>
+                        </div>
+                        <span class="tx-date">{{ moment(tx.timestamp).fromNow() }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Donate Modal (same as in dashboard) -->
+<div id="donate-modal" class="modal">
+    <div class="modal-content">
+        <button type="button" class="close" onclick="closeModal()">&times;</button>
+        <h2>Donate to <span id="project-title"></span></h2>
+        <form id="donate-form" method="POST" onsubmit="return submitDonation(event)">
+            <div class="form-group">
+                <label>Amount (ETH)</label>
+                <input type="number" name="amount" step="0.01" min="0.01" required>
+            </div>
+            <button type="submit" class="submit-btn">Confirm Donation</button>
+        </form>
+    </div>
+</div>
+
+<script>
+function showDonateModal(projectId, projectTitle) {
+    const modal = document.getElementById('donate-modal');
+    const titleSpan = document.getElementById('project-title');
+    const form = document.getElementById('donate-form');
+    
+    titleSpan.textContent = projectTitle;
+    form.action = `/update-project-funds/${projectId}`;
+    modal.style.display = 'block';
+    document.body.classList.add('modal-open');
+    
+    setTimeout(() => {
+        modal.querySelector('input[name="amount"]').focus();
+    }, 100);
+}
+
+function closeModal() {
+    const modal = document.getElementById('donate-modal');
+    modal.style.display = 'none';
+    document.body.classList.remove('modal-open');
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('donate-modal');
+    if (event.target === modal) {
+        closeModal();
+    }
+}
+
+// Close modal on escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeModal();
+    }
+});
+
+function submitDonation(event) {
+    event.preventDefault();
+    const form = event.target;
+    const amount = parseFloat(form.amount.value);
+    
+    if (amount <= 0) {
+        alert('Please enter a valid amount');
+        return false;
+    }
+    
+    fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form)
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Network response was not ok');
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            closeModal();
+            location.reload(); // Refresh to show updated amounts
+        } else {
+            alert(data.error || 'Error processing donation');
+        }
+    })
+    .catch(error => {
+        console.error('Donation error:', error);
+        alert('Error processing donation');
+    });
+    
+    return false;
+}
+
+function shareProject(platform) {
+    const projectUrl = window.location.href;
+    const projectTitle = "{{ project.title }}";
+    const projectDesc = "{{ project.description[:100] }}...";
+    
+    let shareUrl;
+    
+    switch(platform) {
+        case 'twitter':
+            shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(projectTitle)}&url=${encodeURIComponent(projectUrl)}`;
+            break;
+        case 'linkedin':
+            shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(projectUrl)}`;
+            break;
+    }
+    
+    if (shareUrl) {
+        window.open(shareUrl, '_blank', 'width=600,height=400');
+    }
+}
+
+function copyProjectLink() {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(() => {
+        showToast('Link copied to clipboard!');
+    });
+}
+
+function showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 2000);
+    }, 100);
+}
+
+function goToProfile(userId) {
+    if (userId) {
+        window.location.href = `/profile/${userId}`;
+    }
+}
+
+// Enable keyboard navigation for team members
+document.querySelectorAll('.team-member[role="button"]').forEach(member => {
+    member.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            member.click();
+        }
+    });
+});
+
+document.querySelectorAll('.team-member').forEach(member => {
+    member.addEventListener('click', () => {
+        const memberId = member.dataset.memberId;
+        if (memberId) {
+            window.location.href = `/profile/${memberId}`;
+        }
+    });
+});
+</script>
+{% endblock %} 

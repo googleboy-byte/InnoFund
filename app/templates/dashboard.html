@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Search Section -->
+    <div class="search-section">
+        <div class="search-bar">
+            <input type="text" id="search-input" placeholder="Search projects...">
+            <button class="filter-btn" onclick="toggleFilters()">
+                <i class="fas fa-filter"></i>
+            </button>
+        </div>
+        
+        <div class="search-filters" id="filters-panel" style="display: none;">
+            <div class="filter-group">
+                <label>Status</label>
+                <select id="status-filter">
+                    <option value="">All</option>
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>Goal Amount</label>
+                <div class="goal-inputs">
+                    <input type="number" id="min-goal" placeholder="Min ETH">
+                    <input type="number" id="max-goal" placeholder="Max ETH">
+                </div>
+            </div>
+            
+            <div class="filter-group">
+                <label>Sort By</label>
+                <select id="sort-by">
+                    <option value="recent">Most Recent</option>
+                    <option value="goal">Highest Goal</option>
+                    <option value="progress">Most Progress</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Projects Feed -->
+    <div class="projects-feed" id="projects-container">
+        {% for project in projects %}
+        <div class="project-card" onclick="goToProject('{{ project.id }}', event)">
+            <div class="project-header">
+                <h3>{{ project.title }}</h3>
+                <button class="donate-btn" onclick="showDonateModal('{{ project.id }}', '{{ project.title }}')">
+                    Donate
+                </button>
+            </div>
+            
+            <div class="project-body">
+                <p class="project-description">{{ project.description[:200] }}...</p>
+                
+                <div class="funding-progress">
+                    <div class="progress-stats">
+                        <span class="raised">{{ project.funds_raised|default(0, true) }} ETH</span>
+                        <span class="goal">{{ project.goal_amount }} ETH</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ (project.funds_raised|default(0, true) / project.goal_amount * 100)|round|int }}%"></div>
+                    </div>
+                    <div class="progress-percentage">
+                        {{ ((project.funds_raised|default(0, true) / project.goal_amount * 100)|round|int) }}% funded
+                    </div>
+                </div>
+
+                <div class="project-meta">
+                    <div class="meta-item">
+                        <span class="label">Status</span>
+                        <span class="value">{{ project.status|title }}</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="label">Goal</span>
+                        <span class="value">{{ project.goal_amount }} ETH</span>
+                    </div>
+                </div>
+
+                <div class="creator-info">
+                    <div class="creator-avatar">
+                        {{ project.creator_name[0]|upper }}
+                    </div>
+                    <div class="creator-details">
+                        <div class="creator-name">{{ project.creator_name }}</div>
+                        <div class="creation-date">Created {{ moment(project.created_at).fromNow() }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Donate Modal -->
+    <div id="donate-modal" class="modal">
+        <div class="modal-content">
+            <button type="button" class="close" onclick="closeModal()">&times;</button>
+            <h2>Donate to <span id="project-title"></span></h2>
+            <form id="donate-form" method="POST" onsubmit="return submitDonation(event)">
+                <div class="form-group">
+                    <label>Amount (ETH)</label>
+                    <input type="number" name="amount" step="0.01" min="0.01" required>
+                </div>
+                <button type="submit" class="submit-btn">Confirm Donation</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let debounceTimer;
+
+// Search functionality
+document.getElementById('search-input').addEventListener('input', function(e) {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => performSearch(), 300);
+});
+
+// Filter toggle
+function toggleFilters() {
+    const filtersPanel = document.getElementById('filters-panel');
+    filtersPanel.style.display = filtersPanel.style.display === 'none' ? 'block' : 'none';
+}
+
+// Search and filters
+function performSearch() {
+    const query = document.getElementById('search-input').value;
+    const status = document.getElementById('status-filter').value;
+    const minGoal = document.getElementById('min-goal').value;
+    const maxGoal = document.getElementById('max-goal').value;
+    const sortBy = document.getElementById('sort-by').value;
+    
+    const params = new URLSearchParams({
+        q: query,
+        status: status,
+        min_goal: minGoal,
+        max_goal: maxGoal,
+        sort_by: sortBy
+    });
+    
+    fetch(`/search-projects?${params}`)
+        .then(response => response.json())
+        .then(projects => updateProjectsFeed(projects))
+        .catch(error => console.error('Search error:', error));
+}
+
+// Update projects feed
+function updateProjectsFeed(projects) {
+    const container = document.getElementById('projects-container');
+    container.innerHTML = projects.map(project => `
+        <div class="project-card">
+            <!-- Project card HTML (same as template) -->
+        </div>
+    `).join('');
+}
+
+// Donate modal
+function showDonateModal(projectId, projectTitle) {
+    const modal = document.getElementById('donate-modal');
+    const titleSpan = document.getElementById('project-title');
+    const form = document.getElementById('donate-form');
+    
+    titleSpan.textContent = projectTitle;
+    form.action = `/update-project-funds/${projectId}`;
+    modal.style.display = 'block';
+}
+
+// Close modal
+document.querySelector('.close').onclick = function() {
+    document.getElementById('donate-modal').style.display = 'none';
+}
+
+// Filter changes trigger search
+document.querySelectorAll('#filters-panel select, #filters-panel input').forEach(element => {
+    element.addEventListener('change', performSearch);
+});
+
+// Add this function
+function goToProject(projectId, event) {
+    // Don't navigate if clicking on buttons or links
+    if (event.target.closest('.donate-btn') || event.target.closest('a')) {
+        return;
+    }
+    window.location.href = `/view-project/${projectId}`;
+}
+</script>
+{% endblock %} 
