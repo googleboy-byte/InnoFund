@@ -58,7 +58,7 @@
                         <span class="goal">{{ project.goal_amount }} ETH</span>
                     </div>
                     <div class="progress-bar">
-                        <div class="progress-fill" style="width: {{ (project.funds_raised|default(0, true) / project.goal_amount * 100)|round|int }}%"></div>
+                        <div class="progress-fill" style="width: {{ (project.goal_amount > 0) ? (project.funds_raised|default(0, true) / project.goal_amount * 100)|round|int : 0 }}%;"></div>
                     </div>
                     <div class="progress-percentage">
                         {{ ((project.funds_raised|default(0, true) / project.goal_amount * 100)|round|int) }}% funded
@@ -71,8 +71,8 @@
                         <span class="value status-{{ project.status }}">{{ project.status|title }}</span>
                     </div>
                     <div class="meta-item">
-                        <span class="label">Team Members</span>
-                        <span class="value">{{ project.team_members|length }}</span>
+                        <span class="label">Rewards</span>
+                        <span class="value">{{ user_reward_balance }} RTK</span>
                     </div>
                 </div>
             </div>

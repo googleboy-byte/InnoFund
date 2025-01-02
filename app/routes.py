@@ -7,6 +7,7 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from datetime import datetime
 from app import db  # This is the Firestore client
+from web3 import Web3
 
 main = Blueprint('main', __name__)
 
@@ -442,7 +443,8 @@ def search_projects():
         print("Search error:", str(e))
         return jsonify({'error': str(e)}), 500
 
-@main.route('/view-project/<project_id>')
+@main.route('/view-project/<project_id>', methods=['GET'])
+@login_required
 def view_project(project_id):
     try:
         # Get project details from RTDB
@@ -485,11 +487,15 @@ def view_project(project_id):
         # Update project with detailed team member data
         project['team_members'] = team_members_data
         
+        # Get user's reward balance
+        user_reward_balance = get_reward_balance(current_user.wallet_address)
+
         return render_template('view_project.html',
                              title=project['title'],
                              project=project,
                              creator=creator_data,
-                             is_owner=current_user.is_authenticated and current_user.id == project['created_by'])
+                             is_owner=current_user.is_authenticated and current_user.id == project['created_by'],
+                             user_reward_balance=user_reward_balance)
                              
     except Exception as e:
         print("View project error:", str(e))
@@ -530,3 +536,9 @@ def save_wallet():
     except Exception as e:
         print("Save wallet error:", str(e))
         return jsonify({'error': str(e)}), 500
+
+# Add this function to get the user's reward balance
+def get_reward_balance(user_address):
+    reward_token_contract = w3.eth.contract(address=reward_token_address, abi=reward_token_abi)
+    balance = reward_token_contract.functions.balanceOf(user_address).call()
+    return balance
