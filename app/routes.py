@@ -1,3 +1,4 @@
+import os
 from flask import Blueprint, render_template, redirect, url_for, jsonify, session, abort, request, flash
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
@@ -8,6 +9,21 @@ from werkzeug.utils import secure_filename
 from datetime import datetime
 from app import db  # This is the Firestore client
 from web3 import Web3
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Initialize Web3
+infura_url = "https://api.avax-test.network/ext/bc/C/rpc"  # Replace with your endpoint if needed
+w3 = Web3(Web3.HTTPProvider(infura_url))
+
+# Check if connected
+if not w3.isConnected():
+    print("Failed to connect to the blockchain")
+
+# Get the reward token address from environment variables
+reward_token_address = os.getenv("REWARD_TOKEN_ADDRESS")
 
 main = Blueprint('main', __name__)
 
