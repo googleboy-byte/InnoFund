@@ -1,4 +1,5 @@
 import os
+import json
 from flask import Blueprint, render_template, redirect, url_for, jsonify, session, abort, request, flash
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
@@ -24,6 +25,10 @@ if not w3.isConnected():
 
 # Get the reward token address from environment variables
 reward_token_address = os.getenv("REWARD_TOKEN_ADDRESS")
+
+# Load the ABI from the JSON file
+with open('path/to/reward_token_abi.json') as f:
+    reward_token_abi = json.load(f)
 
 main = Blueprint('main', __name__)
 
